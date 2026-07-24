@@ -10,7 +10,20 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+from fastapi import FastAPI
 
+app = FastAPI()
+
+@app.get("/")
+def home():
+    return {"status": "running"}
+
+@app.get("/search")
+def search(query: str):
+    return {
+        "message": "Containerization test successful",
+        "query": query
+    }
 
 client = QdrantClient(
     host="localhost",
@@ -21,16 +34,13 @@ model = SentenceTransformer(
     "all-MiniLM-L6-v2"
 )
 
-
-@app.get("/")
-def home():
-
+@app.get("/search")
+def search(query: str):
     return {
-        "status": "running"
+        "message": "Containerization test successful"
     }
 
-
-@app.get("/search")
+("/search")
 def search(query: str):
 
     vector = model.encode(
