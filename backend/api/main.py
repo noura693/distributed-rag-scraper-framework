@@ -1,8 +1,10 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from qdrant_client import QdrantClient
 from sentence_transformers import SentenceTransformer
-from fastapi.middleware.cors import CORSMiddleware
+from backend.rag.rag_service import answer_question
 app = FastAPI()
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -10,20 +12,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-from fastapi import FastAPI
-
-app = FastAPI()
-
-@app.get("/")
-def home():
-    return {"status": "running"}
-
-@app.get("/search")
-def search(query: str):
-    return {
-        "message": "Containerization test successful",
-        "query": query
-    }
 
 client = QdrantClient(
     host="localhost",
@@ -34,18 +22,18 @@ model = SentenceTransformer(
     "all-MiniLM-L6-v2"
 )
 
-@app.get("/search")
-def search(query: str):
+
+@app.get("/")
+def home():
     return {
-        "message": "Containerization test successful"
+        "status": "running"
     }
 
-("/search")
+
+@app.get("/search")
 def search(query: str):
 
-    vector = model.encode(
-        query
-    ).tolist()
+    vector = model.encode(query).tolist()
 
     results = client.query_points(
         collection_name="documents",
@@ -57,3 +45,7 @@ def search(query: str):
         point.payload
         for point in results.points
     ]
+
+@app.get("/rag")
+def rag(question: str):
+    return answer_question(question)

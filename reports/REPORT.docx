@@ -1,0 +1,268 @@
+Distributed RAG Scraper Framework
+Author
+
+Noura S. Al Hassanieh
+
+1. Introduction
+
+The objective of this project is to design and implement a Distributed Retrieval-Augmented Generation (RAG) Scraper Framework capable of collecting information from websites, storing the extracted content, performing semantic search, and generating answers using a language model.
+
+The framework integrates web scraping, distributed processing, vector search, and question-answering technologies into a single system. The implementation uses Scrapy and Playwright for data collection, Redis and Celery for distributed processing, PostgreSQL for metadata storage, Qdrant for vector search, SentenceTransformer for embeddings, and FLAN-T5 for answer generation.
+
+2. System Architecture
+
+The system consists of the following components:
+
+FastAPI Backend
+Scrapy Crawlers
+Playwright
+Redis
+Celery Workers
+PostgreSQL
+Qdrant
+SentenceTransformer
+FLAN-T5
+
+diagrams/Architecture Diagram.png.png
+Figure 1. Architecture of the Distributed RAG Scraper Framework.
+
+The FastAPI backend serves API requests and communicates with the vector database and language model. Redis acts as a task broker, while Celery executes scraping tasks. Scrapy and Playwright collect data from websites. PostgreSQL stores metadata and Qdrant stores vector embeddings used for semantic retrieval.
+
+3. Web Scraping Module
+3.1 Static Website Scraping
+
+The framework successfully scraped content from:
+https://quotes.toscrape.com/
+
+
+Extracted information includes:
+
+Quote text
+Author name
+Tags
+3.2 JavaScript-Rendered Website Scraping
+
+Playwright was used to scrape dynamic content from:
+https://quotes.toscrape.com/js/
+
+The browser rendered JavaScript content before extraction, allowing the framework to collect dynamically loaded information.
+
+Insert Playwright screenshot here
+
+3.3 Pagination Crawling
+
+The crawler automatically followed multiple pages and collected:
+
+100 items
+10 pages of content
+
+This demonstrates support for websites that contain paginated content.
+
+Insert Scrapy crawl screenshot here
+
+4. Responsible Crawling
+
+The framework follows ethical crawling practices.
+
+Robots.txt Compliance
+Python
+ROBOTSTXT_OBEY = True
+
+Rate Limiting
+DOWNLOAD_DELAY = 1
+
+Per-Domain Request Limiting
+
+CONCURRENT_REQUESTS_PER_DOMAIN = 1
+
+AutoThrottle
+
+AUTOTHROTTLE_ENABLED = True
+
+These features reduce load on target websites and improve responsible crawling behavior.
+
+Insert crawl log screenshot here
+
+5. Distributed Processing
+Redis
+
+Redis is used as a message broker and task queue.
+
+Responsibilities:
+
+Task management
+Job scheduling
+Worker communication
+Celery
+
+Celery workers execute scraping tasks asynchronously.
+
+Benefits:
+
+Scalability
+Parallel execution
+Distributed processing
+6. Data Storage
+PostgreSQL
+
+PostgreSQL stores metadata related to crawled documents and scraping operations.
+
+Examples:
+
+URLs
+Crawl status
+Document metadata
+Qdrant Vector Database
+
+Qdrant stores vector embeddings generated from scraped content.
+
+Configuration:
+
+Vector Size: 384
+Distance Metric: COSINE
+
+
+Capabilities:
+
+Semantic search
+Similarity matching
+Fast vector retrieval
+
+7. Retrieval-Augmented Generation (RAG)
+
+The framework implements a Retrieval-Augmented Generation pipeline.
+
+Embedding Generation
+
+SentenceTransformer model:
+
+
+all-MiniLM-L6-v2
+
+
+is used to generate vector embeddings.
+
+Retrieval
+
+User questions are converted into vector embeddings and matched against stored document vectors inside Qdrant.
+
+Generation
+
+The retrieved context is passed to:
+
+google/flan-t5-base
+
+which generates a final answer.
+
+diagrams/Flowchart.drawio.png
+
+Figure 2. Retrieval-Augmented Generation Workflow.
+
+
+8. API Design
+
+The backend exposes REST endpoints through FastAPI.
+
+Health Endpoint
+HTTP
+GET /
+
+
+Response:
+
+JSON
+{
+"status": "running"
+}
+ 
+Semantic Search Endpoint
+HTTP
+GET /search
+
+Example:
+
+HTTP
+/search?query=distributed workers
+
+Response:
+
+JSON
+[
+{
+"text": "Distributed scraping with Celery workers"
+}
+]
+
+RAG Endpoint
+HTTP
+GET /rag
+
+Example:
+
+HTTP
+/rag?question=How does the system scale?
+
+Response:
+
+JSON
+{
+"answer": "Distributed scraping with Celery workers",
+"sources": [
+"Distributed scraping with Celery workers"
+]
+}
+
+
+
+9. Results
+
+The implemented framework successfully demonstrated:
+
+Static website scraping
+JavaScript-rendered website scraping
+Pagination crawling
+robots.txt compliance
+Rate limiting
+AutoThrottle
+Distributed processing
+PostgreSQL storage
+Vector storage using Qdrant
+Semantic search
+Retrieval-Augmented Generation
+Source attribution
+FastAPI API access
+
+The /rag endpoint successfully returned answers together with supporting sources.
+
+
+
+10. Challenges and Solutions
+Docker Dependency Conflicts
+
+During backend containerization, dependency conflicts involving qdrant-client and related packages were encountered. Docker Compose and infrastructure services were successfully deployed while backend image troubleshooting was performed.
+
+Hugging Face Model Integration
+
+FLAN-T5 required downloading and configuration before successful integration into the RAG pipeline.
+
+API Development
+
+Several endpoint and configuration issues were resolved through testing using Swagger UI.
+
+11. Conclusion
+
+A Distributed Retrieval-Augmented Generation Scraper Framework was successfully designed and implemented.
+
+The framework integrates:
+
+Scrapy
+Playwright
+Redis
+Celery
+PostgreSQL
+Qdrant
+FastAPI
+SentenceTransformer
+FLAN-T5
+
+The system supports web scraping, semantic search, vector retrieval, and retrieval-augmented question answering with source attribution. The final implementation demonstrates a complete pipeline from data collection to AI-powered answer generation.
