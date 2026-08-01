@@ -23,7 +23,6 @@ Qdrant
 SentenceTransformer
 FLAN-T5
 
-diagrams/Architecture Diagram.png.png
 Figure 1. Architecture of the Distributed RAG Scraper Framework.
 
 The FastAPI backend serves API requests and communicates with the vector database and language model. Redis acts as a task broker, while Celery executes scraping tasks. Scrapy and Playwright collect data from websites. PostgreSQL stores metadata and Qdrant stores vector embeddings used for semantic retrieval.
@@ -40,6 +39,7 @@ Extracted information includes:
 Quote text
 Author name
 Tags
+
 3.2 JavaScript-Rendered Website Scraping
 
 Playwright was used to scrape dynamic content from:
@@ -47,7 +47,6 @@ https://quotes.toscrape.com/js/
 
 The browser rendered JavaScript content before extraction, allowing the framework to collect dynamically loaded information.
 
-Insert Playwright screenshot here
 
 3.3 Pagination Crawling
 
@@ -58,7 +57,43 @@ The crawler automatically followed multiple pages and collected:
 
 This demonstrates support for websites that contain paginated content.
 
-Insert Scrapy crawl screenshot here
+3.4 Content Deduplication
+
+To prevent duplicate content from being stored multiple times, the framework implements content deduplication using SHA‑256 hashing. Before storing a document, a hash value is generated based on its content and compared against previously stored hashes.
+
+If the hash already exists, the document is identified as a duplicate and is skipped. Otherwise, the document is stored and indexed normally.
+Example Output:
+New document stored:
+Distributed scraping with Celery workers
+
+Duplicate detected. Skipping.
+
+New document stored:
+Qdrant stores vector embeddings
+
+Benefits
+Reduces storage requirements.
+Prevents duplicate indexing.
+Improves retrieval quality.
+Avoids unnecessary processing.
+
+3.5 Incremental Re-Crawling
+
+To improve crawling efficiency, the framework implements incremental crawling. A hash of newly crawled content is compared against the hash of the previously stored version.
+
+If the content has not changed, the page is skipped. If a change is detected, the page is re-crawled and updated.
+Example Output:
+New page discovered. Crawling.
+
+No changes detected. Skipping crawl.
+
+Changes detected. Re-crawling page.
+
+Benefits
+Reduces network traffic.
+Improves crawl performance.
+Avoids reprocessing unchanged content.
+Supports efficient updates.
 
 4. Responsible Crawling
 
@@ -81,11 +116,22 @@ AUTOTHROTTLE_ENABLED = True
 
 These features reduce load on target websites and improve responsible crawling behavior.
 
-Insert crawl log screenshot here
+4.1 Ethics and Compliance
+
+The framework was designed to respect website policies and minimize impact on target servers.
+
+The following measures were implemented:
+
+robots.txt compliance
+download delays
+per-domain request limits
+AutoThrottle
+incremental crawling
+
+Only publicly accessible content was collected, and crawling activities were limited to educational purposes. The framework was tested on publicly available websites while respecting the websites' terms of service and access restrictions.
 
 5. Distributed Processing
 Redis
-
 Redis is used as a message broker and task queue.
 
 Responsibilities:
@@ -102,6 +148,42 @@ Benefits:
 Scalability
 Parallel execution
 Distributed processing
+
+5.1 Horizontal Scaling
+
+The framework was designed around Redis and Celery to support horizontal scaling.
+
+Redis acts as a centralized message broker while Celery workers independently consume tasks from the queue. Additional worker instances can be added to increase throughput and processing capacity.
+Architecture:
+Redis Queue
+      │
+ ┌────┼────┐
+ ▼    ▼    ▼
+Worker 1
+Worker 2
+Worker 3
+
+This design allows the scraping system to scale horizontally by adding workers without modifying the application architecture.
+
+5.2 Dead-Letter Queue and Failure Recovery
+
+To improve fault tolerance, the framework implements retry logic and a Dead-Letter Queue (DLQ).
+
+Failed tasks are retried multiple times automatically. If a task exceeds the maximum retry count, it is moved into the dead-letter queue for later inspection rather than being retried indefinitely.
+
+expected output:
+Task 1 failed (attempt 1)
+Task 1 failed (attempt 2)
+Task 1 failed (attempt 3)
+
+Task 1 moved to Dead-Letter Queue
+
+Benefits
+Prevents endless retries.
+Improves reliability.
+Supports failure analysis.
+Increases fault tolerance.
+
 6. Data Storage
 PostgreSQL
 
@@ -127,6 +209,19 @@ Capabilities:
 Semantic search
 Similarity matching
 Fast vector retrieval
+6.1 Content Versioning
+
+The framework maintains historical versions of crawled content rather than silently overwriting previous data. Each update is stored with a timestamp, allowing changes over time to be tracked and audited.
+ex:
+Version 1
+Distributed scraping with Celery workers
+
+Version 2
+Distributed scraping with Celery workers and Redis
+
+Version 3
+Distributed scraping with Celery workers, Redis and Qdrant
+
 
 7. Retrieval-Augmented Generation (RAG)
 
@@ -134,13 +229,7 @@ The framework implements a Retrieval-Augmented Generation pipeline.
 
 Embedding Generation
 
-SentenceTransformer model:
-
-
-all-MiniLM-L6-v2
-
-
-is used to generate vector embeddings.
+SentenceTransformer model: all-MiniLM-L6-v2 is used to generate vector embeddings.
 
 Retrieval
 
@@ -154,66 +243,93 @@ google/flan-t5-base
 
 which generates a final answer.
 
-diagrams/Flowchart.drawio.png
-
 Figure 2. Retrieval-Augmented Generation Workflow.
 
+7.1 Chunking Strategy
+
+The framework implements an overlap-based chunking strategy before indexing content into the vector database.
+
+Instead of embedding entire documents as a single vector, documents are divided into overlapping chunks. This approach preserves context between neighboring chunks while improving retrieval accuracy.
+
+example:
+Chunk 1:
+Distributed scraping with Celery workers...
+
+Chunk 2:
+Redis manages task queues...
+
+Chunk 3:
+Qdrant stores vector embeddings...
+
+Benefits
+Preserves contextual continuity.
+Reduces information loss.
+Improves semantic retrieval.
+Enhances RAG performance.
+
+7.2 Multi-Source Retrieval and Context Generation
+
+The retrieval component is configured to retrieve multiple relevant documents from Qdrant for each query.
+
+Retrieved sources are combined into a shared context before being passed to the FLAN‑T5 language model. This enables generated answers to incorporate information from multiple retrieved sources rather than relying on a single document.
+
+Workflow:
+Question
+↓
+Generate Query Embedding
+↓
+Retrieve Top-K Sources
+↓
+Merge Retrieved Context
+↓
+FLAN-T5
+↓
+Generated Answer + Citations
+
+Benefits:
+Supports information synthesis.
+Improves answer completeness.
+Reduces reliance on a single source.
+Increases retrieval robustness.
 
 8. API Design
 
 The backend exposes REST endpoints through FastAPI.
 
 Health Endpoint
-HTTP
 GET /
 
-
-Response:
-
-JSON
-{
-"status": "running"
-}
- 
 Semantic Search Endpoint
-HTTP
 GET /search
 
-Example:
-
-HTTP
-/search?query=distributed workers
-
-Response:
-
-JSON
-[
-{
-"text": "Distributed scraping with Celery workers"
-}
-]
 
 RAG Endpoint
-HTTP
 GET /rag
 
-Example:
+Raw Data Endpoint
+GET /raw
+Returns raw scraped data.
 
-HTTP
-/rag?question=How does the system scale?
+Processed Data Endpoint
+GET /processed
+Returns cleaned and processed content.
 
-Response:
+Keyword Search Endpoint
+GET /keyword
+Performs keyword-based search across indexed content.
 
-JSON
-{
-"answer": "Distributed scraping with Celery workers",
-"sources": [
-"Distributed scraping with Celery workers"
-]
-}
+8.1 Web User Interface
 
+A frontend interface was developed using React and Vite.
 
+The interface connects directly to the FastAPI backend and provides:
 
+Semantic search functionality
+RAG question-answering functionality
+Display of generated answers
+Display of supporting source citations
+
+This interface enables real-time interaction with the retrieval and question-answering components of the framework.
 9. Results
 
 The implemented framework successfully demonstrated:
@@ -224,30 +340,119 @@ Pagination crawling
 robots.txt compliance
 Rate limiting
 AutoThrottle
-Distributed processing
-PostgreSQL storage
-Vector storage using Qdrant
+Distributed processing with Redis and Celery
+Content deduplication
+Incremental re-crawling
+Content versioning
+Dead-letter queue handling
+Semantic chunking strategy
+PostgreSQL metadata storage
+Qdrant vector storage
 Semantic search
 Retrieval-Augmented Generation
 Source attribution
 FastAPI API access
+React/Vite frontend interface
 
-The /rag endpoint successfully returned answers together with supporting sources.
-
-
+The /rag endpoint successfully returned generated answers alongside supporting source citations.
 
 10. Challenges and Solutions
 Docker Dependency Conflicts
 
-During backend containerization, dependency conflicts involving qdrant-client and related packages were encountered. Docker Compose and infrastructure services were successfully deployed while backend image troubleshooting was performed.
+During backend containerization, dependency conflicts involving Python packages and Qdrant-related components were encountered. Infrastructure services such as Redis, PostgreSQL, and Qdrant were successfully deployed through Docker.
 
 Hugging Face Model Integration
 
-FLAN-T5 required downloading and configuration before successful integration into the RAG pipeline.
+FLAN‑T5 required downloading and configuring a local language model before successful integration into the RAG pipeline.
 
-API Development
+Retrieval-Augmented Generation
 
-Several endpoint and configuration issues were resolved through testing using Swagger UI.
+Developing an effective retrieval pipeline required integrating embeddings, vector search, chunking, multi-source retrieval, and answer generation into a single workflow.
+
+Distributed Processing
+
+Implementing reliable task processing required retries, fault handling, and the introduction of a dead-letter queue for repeatedly failing tasks.
+
+10.1 Technology Selection Rationale
+Python
+
+Python was selected because it provides mature libraries for web scraping, machine learning, distributed processing, and API development.
+
+Alternative considered:
+
+Node.js
+
+Python was chosen due to stronger ecosystem support for Scrapy, SentenceTransformer, and machine learning libraries
+
+Scrapy
+
+Scrapy was selected as the primary crawling framework because it provides high-performance crawling, request scheduling, and built-in support for large-scale scraping.
+
+Alternative considered:
+
+BeautifulSoup
+
+BeautifulSoup was not selected because it is a parsing library rather than a complete crawling framework.
+
+Playwright
+
+Playwright was chosen to handle JavaScript-rendered websites.
+
+Alternative considered:
+
+Selenium
+
+Playwright was selected because it offers modern browser automation, improved performance, and simpler integration.
+
+Redis and Celery
+
+Redis and Celery were selected to support distributed task execution and asynchronous processing.
+
+Alternative considered:
+
+RabbitMQ
+
+Redis was chosen due to its simpler setup and integration with Celery.
+
+PostgreSQL
+
+PostgreSQL was chosen for metadata storage because of its reliability and strong support for structured data.
+
+Alternative considered:
+
+MongoDB
+
+PostgreSQL was preferred due to its transactional consistency and relational model.
+
+Qdrant
+
+Qdrant was selected as the vector database for semantic search and retrieval.
+
+Alternative considered:
+
+FAISS
+
+Qdrant was chosen because it provides a dedicated vector database with persistence and API support.
+
+FastAPI
+
+FastAPI was used to build the backend API because of its performance and automatic Swagger documentation.
+
+Alternative considered:
+
+Flask
+
+FastAPI was chosen due to built-in validation and API documentation support.
+
+FLAN-T5
+
+FLAN‑T5 was selected as the language model for answer generation.
+
+Alternative considered:
+
+OpenAI GPT models
+
+FLAN‑T5 was chosen because it can be executed locally without external API dependency.
 
 11. Conclusion
 
@@ -262,7 +467,10 @@ Celery
 PostgreSQL
 Qdrant
 FastAPI
+React/Vite
 SentenceTransformer
-FLAN-T5
+FLAN‑T5
 
-The system supports web scraping, semantic search, vector retrieval, and retrieval-augmented question answering with source attribution. The final implementation demonstrates a complete pipeline from data collection to AI-powered answer generation.
+The final implementation supports distributed web scraping, JavaScript-rendered content extraction, semantic indexing, deduplication, incremental crawling, content versioning, fault tolerance through dead-letter queues, semantic retrieval, and retrieval‑augmented question answering with source attribution.
+
+The completed system demonstrates a scalable architecture capable of collecting, processing, indexing, and querying web content through both API and web-based interfaces.

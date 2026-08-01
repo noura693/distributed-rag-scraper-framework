@@ -29,7 +29,7 @@ def answer_question(question: str):
     results = client.query_points(
         collection_name="documents",
         query=query_vector,
-        limit=3
+        limit=5
     )
 
     sources = [
@@ -40,15 +40,19 @@ def answer_question(question: str):
     context = "\n".join(sources)
 
     prompt = f"""
-Answer the question using the provided context.
+Use all relevant information from the context below.
+
+If multiple pieces of information are available,
+combine them into a single answer.
 
 Context:
 {context}
 
 Question:
 {question}
-"""
 
+Provide a concise answer based on all relevant sources.
+"""
     inputs = tokenizer(
         prompt,
         return_tensors="pt"
